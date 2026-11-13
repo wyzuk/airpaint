@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>AIRPAINT — Real-Time AI Hand Gesture Drawing Studio</title>
+    <meta name="description" content="Draw in the air using your webcam and natural hand gestures. Built with MediaPipe Tasks Vision and HTML5 Canvas." />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23007AFF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m12 19 7-7 3 3-7 7-3-3z'/><path d='m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z'/><path d='m2 2 7.586 7.586'/><circle cx='11' cy='11' r='2'/></svg>" />
+    <link rel="stylesheet" href="/src/styles/global.css" />
+    <link rel="stylesheet" href="/src/styles/studio.css" />
+    <link rel="stylesheet" href="/src/styles/components.css" />
+  </head>
+  <body>
+    <!-- Welcome Screen / Studio Introduction -->
+    <div id="welcome-screen">
+      <div class="welcome-content">
+        <div class="welcome-logo-badge">
+          <i data-lucide="sparkles" style="width: 36px; height: 36px;"></i>
+        </div>
+        <h1 class="welcome-title">AIRPAINT</h1>
+        <p class="welcome-tagline">Your hands. Your imagination. No boundaries.</p>
+        <p class="welcome-desc">
+          Turn your webcam into an interactive digital canvas. Paint, sketch, and create freely in mid-air using intuitive hand gestures.
+        </p>
+
+        <!-- Gesture Overview Cards -->
+        <div class="gesture-cards-grid">
+          <div class="gesture-preview-card">
+            <span class="gesture-card-emoji">☝️</span>
+            <span class="gesture-card-title">1 Finger</span>
+            <span class="gesture-card-desc">Pen / Draw</span>
+          </div>
+          <div class="gesture-preview-card">
+            <span class="gesture-card-emoji">✌️</span>
+            <span class="gesture-card-title">2 Fingers</span>
+            <span class="gesture-card-desc">Eraser</span>
+          </div>
+          <div class="gesture-preview-card">
+            <span class="gesture-card-emoji">🤟</span>
+            <span class="gesture-card-title">3 Fingers</span>
+            <span class="gesture-card-desc">Palette Mode</span>
+          </div>
+          <div class="gesture-preview-card">
+            <span class="gesture-card-emoji">✋</span>
+            <span class="gesture-card-title">5 Fingers</span>
+            <span class="gesture-card-desc">Pause</span>
+          </div>
+          <div class="gesture-preview-card">
+            <span class="gesture-card-emoji">✊</span>
+            <span class="gesture-card-title">Closed Fist</span>
+            <span class="gesture-card-desc">Idle</span>
+          </div>
+        </div>
+
+        <button id="btn-start-drawing" class="welcome-cta-btn">
+          <span>Start Drawing</span>
+          <i data-lucide="arrow-right" style="width: 20px; height: 20px;"></i>
+        </button>
+
+        <p class="welcome-permission-note">
+          Requires camera permission. Hand tracking runs 100% locally on your device for absolute privacy.
+        </p>
+      </div>
+    </div>
+
+    <!-- Main Drawing Studio Application -->
+    <main id="app">
+      <!-- Layered Stage -->
+      <div class="studio-stage" id="studio-stage">
+        <!-- Layer 1: Mirrored Live Camera Feed -->
+        <video id="camera-video" playsinline muted autoplay></video>
+
+        <!-- Layer 2: Transparent Drawing Canvas -->
+        <canvas id="drawing-canvas"></canvas>
+
+        <!-- Layer 3: Tracking & Visual Feedback Canvas -->
+        <canvas id="overlay-canvas"></canvas>
+      </div>
+
+      <!-- Floating 3-Finger Gesture Color Palette -->
+      <div id="floating-palette-container" aria-hidden="true"></div>
+
+      <!-- Layer 4: Glassmorphic UI Controls -->
+      <div class="studio-ui-layer">
+        <!-- Top Bar -->
+        <header class="studio-topbar">
+          <div class="topbar-left">
+            <div class="brand-badge">
+              <div class="brand-icon-wrapper">
+                <i data-lucide="wand-2" style="width: 16px; height: 16px;"></i>
+              </div>
+              <span>AIRPAINT</span>
+            </div>
+            <span class="app-version-pill">PRO STUDIO</span>
+          </div>
+
+          <!-- Live Gesture Status Pill -->
+          <div class="topbar-center">
+            <div class="topbar-gesture-pill" id="topbar-gesture-pill">
+              <span class="gesture-status-indicator" id="gesture-indicator-dot"></span>
+              <span class="gesture-label-text" id="gesture-label-text">Ready</span>
+              <span class="gesture-badge-text" id="gesture-badge-text">No Hand</span>
+            </div>
+          </div>
+
+          <!-- System Status & Controls -->
+          <div class="topbar-right">
+            <div class="camera-status-badge">
+              <span class="status-dot-pulse"></span>
+              <span id="camera-status-text">Camera Active</span>
+              <span class="fps-counter" id="fps-counter">60 FPS</span>
+            </div>
+
+            <button class="topbar-btn" id="btn-guide-modal" title="Gesture Guide" aria-label="Gesture Guide">
+              <i data-lucide="help-circle" style="width: 18px; height: 18px;"></i>
+            </button>
+
+            <button class="topbar-btn" id="btn-settings-modal" title="Studio Settings" aria-label="Settings">
+              <i data-lucide="settings" style="width: 18px; height: 18px;"></i>
+            </button>
+
+            <button class="topbar-btn" id="btn-toggle-fullscreen" title="Toggle Fullscreen" aria-label="Fullscreen">
+              <i data-lucide="maximize" style="width: 18px; height: 18px;"></i>
+            </button>
+          </div>
+        </header>
+
+        <!-- Middle Workspace Area with Left Toolbar -->
+        <div class="studio-body">
+          <aside class="studio-left-toolbar">
+            <button class="tool-btn active" id="tool-pen" title="Pen Mode (1 Finger)" aria-label="Pen Mode">
+              <i data-lucide="pen-tool" style="width: 20px; height: 20px;"></i>
+            </button>
+
+            <button class="tool-btn" id="tool-eraser" title="Eraser Mode (2 Fingers)" aria-label="Eraser Mode">
+              <i data-lucide="eraser" style="width: 20px; height: 20px;"></i>
+            </button>
+
+            <div class="toolbar-divider"></div>
+
+            <button class="tool-btn" id="tool-undo" title="Undo (Ctrl+Z)" aria-label="Undo" disabled>
+              <i data-lucide="undo" style="width: 20px; height: 20px;"></i>
+            </button>
+
+            <button class="tool-btn" id="tool-redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" disabled>
+              <i data-lucide="redo" style="width: 20px; height: 20px;"></i>
+            </button>
+
+            <div class="toolbar-divider"></div>
+
+            <button class="tool-btn" id="tool-clear" title="Clear Canvas" aria-label="Clear Canvas">
+              <i data-lucide="trash-2" style="width: 20px; height: 20px;"></i>
+            </button>
+
+            <button class="tool-btn" id="tool-skeleton" title="Toggle Hand Landmarks Skeleton" aria-label="Toggle Skeleton">
+              <i data-lucide="scan" style="width: 20px; height: 20px;"></i>
+            </button>
+          </aside>
+        </div>
+
+        <!-- Bottom Toolbar -->
+        <footer class="studio-bottombar">
+          <!-- Active Color and Quick Swatches -->
+          <div class="bottombar-colors">
+            <div class="active-color-preview" id="active-color-preview" title="Current Color" style="background-color: #007AFF;"></div>
+            <div class="quick-swatches" id="quick-swatches">
+              <!-- Swatches populated by app.js -->
+            </div>
+          </div>
+
+          <!-- Brush & Eraser Size Controls -->
+          <div class="bottombar-sliders">
+            <div class="slider-group">
+              <label for="brush-size-slider">
+                <i data-lucide="paintbrush" style="width: 14px; height: 14px;"></i>
+                <span>Brush</span>
+              </label>
+              <input type="range" id="brush-size-slider" class="slider-control" min="2" max="50" value="8" />
+              <span class="size-value-badge" id="brush-size-value">8px</span>
+            </div>
+
+            <div class="slider-group">
+              <label for="eraser-size-slider">
+                <i data-lucide="eraser" style="width: 14px; height: 14px;"></i>
+                <span>Eraser</span>
+              </label>
+              <input type="range" id="eraser-size-slider" class="slider-control" min="10" max="100" value="36" />
+              <span class="size-value-badge" id="eraser-size-value">36px</span>
+            </div>
+          </div>
+
+          <!-- Export Artwork Button & Dropdown -->
+          <div class="export-dropdown-wrapper">
+            <button class="export-btn" id="btn-export-toggle">
+              <i data-lucide="download" style="width: 16px; height: 16px;"></i>
+              <span>Save Artwork</span>
+              <i data-lucide="chevron-up" style="width: 14px; height: 14px;"></i>
+            </button>
+
+            <div class="export-menu" id="export-menu">
+              <button class="export-menu-item" data-mode="transparent-png">
+                <span>Transparent PNG (Artwork only)</span>
+                <i data-lucide="file-image" style="width: 14px; height: 14px;"></i>
+              </button>
+              <button class="export-menu-item" data-mode="camera-png">
+                <span>With Live Camera Background</span>
+                <i data-lucide="camera" style="width: 14px; height: 14px;"></i>
+              </button>
+              <button class="export-menu-item" data-mode="white-jpeg">
+                <span>Studio White Background</span>
+                <i data-lucide="square" style="width: 14px; height: 14px;"></i>
+              </button>
+              <button class="export-menu-item" data-mode="black-jpeg">
+                <span>Obsidian Black Background</span>
+                <i data-lucide="moon" style="width: 14px; height: 14px;"></i>
+              </button>
+            </div>
+          </div>
+        </footer>
+      </div>
+    </main>
+
+    <!-- Gesture Guide Modal -->
+    <div class="modal-overlay" id="modal-guide" aria-hidden="true">
+      <div class="modal-card">
+        <button class="modal-close-btn" id="btn-close-guide" aria-label="Close">
+          <i data-lucide="x" style="width: 18px; height: 18px;"></i>
+        </button>
+        <h2 class="modal-title">Hand Gesture Guide</h2>
+        <p class="modal-subtitle">Control AIRPAINT effortlessly with natural hand gestures in front of your camera.</p>
+
+        <div class="guide-grid">
+          <div class="guide-item">
+            <div class="guide-icon-badge">☝️</div>
+            <div class="guide-content">
+              <h4>1 Finger — Pen Mode</h4>
+              <p>Raise only your index finger. Move your fingertip smoothly across the air to draw on the canvas.</p>
+            </div>
+          </div>
+          <div class="guide-item">
+            <div class="guide-icon-badge">✌️</div>
+            <div class="guide-content">
+              <h4>2 Fingers — Eraser Mode</h4>
+              <p>Raise your index and middle fingers together. Move across existing strokes to erase them cleanly.</p>
+            </div>
+          </div>
+          <div class="guide-item">
+            <div class="guide-icon-badge">🤟</div>
+            <div class="guide-content">
+              <h4>3 Fingers — Color Palette</h4>
+              <p>Raise 3 fingers (index, middle, ring). A floating palette appears; swipe your hand left or right to switch colors.</p>
+            </div>
+          </div>
+          <div class="guide-item">
+            <div class="guide-icon-badge">✋</div>
+            <div class="guide-content">
+              <h4>5 Fingers — Open Palm (Pause)</h4>
+              <p>Open your entire palm facing the camera to pause drawing and safely rest your hand without marking the canvas.</p>
+            </div>
+          </div>
+          <div class="guide-item">
+            <div class="guide-icon-badge">✊</div>
+            <div class="guide-content">
+              <h4>Closed Fist — Idle Mode</h4>
+              <p>Close your fist to enter idle mode. No drawing or erasing occurs.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="modal-settings" aria-hidden="true">
+      <div class="modal-card">
+        <button class="modal-close-btn" id="btn-close-settings" aria-label="Close">
+          <i data-lucide="x" style="width: 18px; height: 18px;"></i>
+        </button>
+        <h2 class="modal-title">Studio Settings</h2>
+        <p class="modal-subtitle">Configure camera devices, AI gesture sensitivity, and graphics performance.</p>
+
+        <div class="settings-list">
+          <div class="settings-row">
+            <div class="settings-label-group">
+              <span class="settings-title">Camera Device</span>
+              <span class="settings-desc">Select active webcam sensor</span>
+            </div>
+            <select id="setting-camera-device" class="settings-select">
+              <option value="">Default Front Camera</option>
+            </select>
+          </div>
+
+          <div class="settings-row">
+            <div class="settings-label-group">
+              <span class="settings-title">Camera Resolution</span>
+              <span class="settings-desc">Balancing detail and frame rate</span>
+            </div>
+            <select id="setting-resolution" class="settings-select">
+              <option value="720p" selected>HD (1280 × 720) — Recommended</option>
+              <option value="1080p">Full HD (1920 × 1080)</option>
+              <option value="480p">Eco / Low Power (640 × 480)</option>
+            </select>
+          </div>
+
+          <div class="settings-row">
+            <div class="settings-label-group">
+              <span class="settings-title">Mirror Camera Preview</span>
+              <span class="settings-desc">Mirrored view makes hand gestures feel natural</span>
+            </div>
+            <label class="switch-toggle">
+              <input type="checkbox" id="setting-mirror" checked />
+              <span class="slider-switch"></span>
+            </label>
+          </div>
+
+          <div class="settings-row">
+            <div class="settings-label-group">
+              <span class="settings-title">Hand Landmarks Skeleton</span>
+              <span class="settings-desc">Show 21-point MediaPipe hand skeleton overlay</span>
+            </div>
+            <label class="switch-toggle">
+              <input type="checkbox" id="setting-skeleton" />
+              <span class="slider-switch"></span>
+            </label>
+          </div>
+
+          <div class="settings-row">
+            <div class="settings-label-group">
+              <span class="settings-title">Gesture Sensitivity</span>
+              <span class="settings-desc">Debounce threshold for gesture recognition</span>
+            </div>
+            <input type="range" id="setting-sensitivity" class="slider-control" min="1" max="5" value="3" />
+          </div>
+
+          <div class="settings-row">
+            <div class="settings-label-group">
+              <span class="settings-title">Drawing Smoothing</span>
+              <span class="settings-desc">Adaptive EMA interpolation for stroke fluidity</span>
+            </div>
+            <input type="range" id="setting-smoothing" class="slider-control" min="1" max="5" value="3" />
+          </div>
+
+          <div class="settings-row">
+            <div class="settings-label-group">
+              <span class="settings-title">Eco / Battery Saver Mode</span>
+              <span class="settings-desc">Throttles AI inference to save CPU/battery</span>
+            </div>
+            <label class="switch-toggle">
+              <input type="checkbox" id="setting-eco" />
+              <span class="slider-switch"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Clear Confirmation Modal -->
+    <div class="modal-overlay" id="modal-clear-confirm" aria-hidden="true">
+      <div class="modal-card" style="max-width: 440px;">
+        <h2 class="modal-title">Clear Canvas?</h2>
+        <p class="modal-subtitle">
+          This will wipe all artwork from the screen. You can undo this action immediately if needed.
+        </p>
+        <div class="confirm-actions">
+          <button class="btn-secondary" id="btn-cancel-clear">Cancel</button>
+          <button class="btn-danger" id="btn-confirm-clear">Clear All</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/app.js"></script>
+  </body>
+</html>

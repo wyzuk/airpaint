@@ -1,0 +1,23 @@
+{
+  "name": "airpaint",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AIRPAINT — Real-Time AI Hand Gesture Drawing Studio",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "^0.10.14",
+    "canvas-confetti": "^1.9.4",
+    "lucide": "^0.460.0"
+  },
+  "devDependencies": {
+    "happy-dom": "^21.0.4",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.5"
+  }
+}
